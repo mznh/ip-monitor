@@ -15,6 +15,7 @@ class IPMonitor
   def initialize
     @webhook_url = ENV.fetch('DISCORD_WEBHOOK_URL')
     @ip_cache_file = ENV.fetch('IP_CACHE_FILE', '.last_ip')
+    @ip_icon_url = ENV.fetch('IP_ICON_URL')
     @logger = Logger.new($stdout)
   end
 
@@ -63,7 +64,7 @@ class IPMonitor
     {
       content: "🏠 Global IP Address Changed: **#{msg}**",
       username: "IP Monitor",
-      avatar_url: "https://www.ruby-lang.org/images/header-ruby-logo.png"
+      avatar_url: @ip_icon_url
     }.to_json
   end
 
