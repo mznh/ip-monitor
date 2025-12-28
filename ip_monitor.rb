@@ -1,6 +1,7 @@
 #!/usr/bin/env ruby
 
 require 'dotenv'
+require 'socket'
 require 'net/http'
 require 'uri'
 require 'json'
@@ -16,13 +17,21 @@ class IPMonitor
     @webhook_url = ENV.fetch('DISCORD_WEBHOOK_URL')
     @ip_cache_file = ENV.fetch('IP_CACHE_FILE', '.last_ip')
     @ip_icon_url = ENV.fetch('IP_ICON_URL')
+    @expected_local_ip = ENV.fetch('EXPECTED_LOCAL_IP')
     @logger = Logger.new($stdout)
   end
 
   def run
     current_ip = fetch_current_ip
+    local_ip = fetch_local_ip
     last_ip = read_last_ip
 
+    # ローカルIPアドレスが期待されているものと違ったら通知
+    if local_ip != @expected_local_ip
+      notify_discord("🏠 Local IP Address is wrong!: **#{local_ip}**")
+      @logger.info "Local IP Address is wrong: #{local_ip}"
+      return 
+    end
     # ガード節：IPに変更がなければ終了
     if current_ip == last_ip
       @logger.info "IP Address has not changed."
@@ -31,7 +40,8 @@ class IPMonitor
 
     @logger.info "IP changed: #{last_ip} -> #{current_ip}"
     
-    if notify_discord(current_ip)
+    # グローバルIPに変更があったら通知
+    if notify_discord("🏠 Global IP Address Changed: **#{current_ip}**")
       save_ip(current_ip)
     end
   rescue => e
@@ -51,6 +61,17 @@ class IPMonitor
     response.body.strip
   end
 
+  def fetch_local_ip
+    # 実際に通信は行わず、パケットを外に送る際の「自分の出口」のIPを特定する
+    udp = UDPSocket.new
+    udp.connect("8.8.8.8", 1)
+    ip = udp.addr[3]
+    udp.close
+    ip
+  rescue => e
+    "Unavailable (#{e.message})"
+  end
+
   def read_last_ip
     return nil unless File.exist?(@ip_cache_file)
     File.read(@ip_cache_file).strip
@@ -62,7 +83,7 @@ class IPMonitor
 
   def discord_payload(msg)
     {
-      content: "🏠 Global IP Address Changed: **#{msg}**",
+      content: msg,
       username: "IP Monitor",
       avatar_url: @ip_icon_url
     }.to_json

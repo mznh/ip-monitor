@@ -1,0 +1,4 @@
+DISCORD_WEBHOOK_URL="https://example.com/discord_webhook_url"
+IP_CACHE_FILE=".last_ip"
+IP_ICON_URL="https://example.com/icon.png"
+EXPECTED_LOCAL_IP=192.168.1.1
